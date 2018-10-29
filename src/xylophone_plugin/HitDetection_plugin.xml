@@ -1,0 +1,7 @@
+<library path="lib/libHitDetection">
+    <class name="roboy_controller/HitDetectionPlugin" type="HitDetectionPlugin"
+           base_class_type="gazebo::ModelPlugin">
+        <description>This is a hitdetection plugin.</description>
+    </class>
+</library>
+
