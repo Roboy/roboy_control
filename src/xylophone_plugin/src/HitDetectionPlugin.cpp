@@ -44,7 +44,7 @@ public:
 
         std::cerr << "\nThe Hit Detection Plugin plugin is attached to model[" <<
                   _model->GetName() << "]\n";
-
+///////////////////////////////
         if (_model->GetJointCount() == 0) {
             std::cerr << "Invalid joint count, Hit Detection plugin not loaded\n";
             return;

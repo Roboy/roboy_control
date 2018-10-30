@@ -47,21 +47,12 @@ class Xylophone():
                             'C_3']
         self.key_pos_listener = tf.TransformListener()
         self.get_ik = rospy.ServiceProxy('/ik', roboy_communication_middleware.srv.InverseKinematics)
-        self.hip_joint_publ = rospy.Publisher('/hip_joint/hip_joint/target', std_msgs.msg.Float32, queue_size=1)
-        self.sphere_left_axis0_publ = rospy.Publisher('/sphere_left_axis0/sphere_left_axis0/target', std_msgs.msg.Float32, queue_size=1)
-        self.sphere_left_axis1_publ = rospy.Publisher('/sphere_left_axis1/sphere_left_axis1/target', std_msgs.msg.Float32, queue_size=1)
-        self.sphere_left_axis2_publ = rospy.Publisher('/sphere_left_axis2/sphere_left_axis2/target', std_msgs.msg.Float32, queue_size=1)
-        self.elbow_left_rot0_publ = rospy.Publisher('/elbow_left_rot0/elbow_left_rot0/target', std_msgs.msg.Float32, queue_size=1)
-        self.elbow_left_rot1_publ = rospy.Publisher('/elbow_left_rot1/elbow_left_rot1/target', std_msgs.msg.Float32, queue_size=1)
-        self.left_wrist_0_publ = rospy.Publisher('/left_wrist_0/left_wrist_0/target', std_msgs.msg.Float32, queue_size=1)
-        self.left_wrist_1_publ = rospy.Publisher('/left_wrist_1/left_wrist_1/target', std_msgs.msg.Float32, queue_size=1)
-
-        # self.left_arm_publisher_list = [self.hip_joint_publ,
-        #                            self.sphere_left_axis0_publ,
-        #                            self.sphere_left_axis1_publ,
-        #                            self.sphere_left_axis2_publ,
-        #                            self.elbow_left_rot0_publ,
-        #                            self.elbow_left_rot1_publ]
+        self.links = ['/hip_joint/hip_joint/target', '/sphere_axis0/sphere_axis0/target', '/sphere_axis1/sphere_axis1/target',
+                      '/sphere_axis2/sphere_axis2/target', '/elbow_left/elbow_left/target', '/wrist_left/wrist_left/target']
+        self.publisher =[]
+        for link in self.links:
+            self.publisher.append(rospy.Publisher(link, std_msgs.msg.Float32,queue_size=1))
+        print("Publishers for links were initialized")
 
     def get_key_pos(self, key):
         # get key positions
@@ -75,32 +66,10 @@ class Xylophone():
         return position
 
     def left_arm_publisher(self, ik_values):
-        #TODO improve
-        msg0 = std_msgs.msg.Float32()
-        msg0.data = ik_values.angles[0]
-        msg1 = std_msgs.msg.Float32()
-        msg1.data = ik_values.angles[1]
-        msg2 = std_msgs.msg.Float32()
-        msg2.data = ik_values.angles[2]
-        msg3 = std_msgs.msg.Float32()
-        msg3.data = ik_values.angles[3]
-        msg4 = std_msgs.msg.Float32()
-        msg4.data = ik_values.angles[4]
-        msg5 = std_msgs.msg.Float32()
-        msg5.data = ik_values.angles[5]
-        msg6 = std_msgs.msg.Float32()
-        msg6.data = ik_values.angles[6]
-        msg7 = std_msgs.msg.Float32()
-        msg7.data = ik_values.angles[7]
-
-        self.hip_joint_publ.publish(msg0)
-        self.sphere_left_axis0_publ.publish(msg1)
-        self.sphere_left_axis1_publ.publish(msg2)
-        self.sphere_left_axis2_publ.publish(msg3)
-        self.elbow_left_rot0_publ.publish(msg4)
-        self.elbow_left_rot1_publ.publish(msg5)
-        self.left_wrist_0_publ.publish(msg6)
-        self.left_wrist_1_publ.publish(msg7)
+        for angle, publ in zip(ik_values.angles, self.publisher):
+            temp_msg = std_msgs.msg.Float32()
+            temp_msg.data = angle
+            publ.publish(temp_msg)
         print("PUBLISHED IK TO JOINTS")
 
     def hit_key(self, key_pos):
@@ -110,15 +79,9 @@ class Xylophone():
         current_pose.position.y = key_pos[0][1]
         current_pose.position.z = key_pos[0][2]
 
-        # not needed for type 1 message which assumes position in world frame
-        # current_pose.orientation.x = key_pos[1][0]
-        # current_pose.orientation.y = key_pos[1][1]
-        # current_pose.orientation.z = key_pos[1][2]
-        # current_pose.orientation.w = key_pos[1][3]
-
         print(current_pose)
 
-        current_ik = self.get_ik.call("palm", 1, 'palm', current_pose)
+        current_ik = self.get_ik.call("hand_left", 1, 'hand_left', current_pose)
         print("\ncurrent ik")
         print(current_ik)
         print("\n")
@@ -128,12 +91,12 @@ class Xylophone():
 
 if __name__ == '__main__':
     rospy.init_node('xylophone_hitter')
-    marker_publisher = rospy.Publisher('visualization', Marker, queue_size=100)
+    marker_publisher = rospy.Publisher('keys_visualization', Marker, queue_size=100)
 
     xyl = Xylophone()
-    rospy.Rate(1).sleep()  # for init
+    rospy.Rate(1).sleep()  # wait 1 second for init
 
-    for note in xyl.notes_list[:]:
+    for note in xyl.notes_list[4:5]:
         print(note)
         current_key_pos = xyl.get_key_pos(note)
         print("position of %s" %note, current_key_pos)
