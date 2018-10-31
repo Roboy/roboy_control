@@ -97,6 +97,7 @@ public:
                 br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "world", link_name));
                 Eigen::Vector3d pos(linkPose.pos.x, linkPose.pos.y, linkPose.pos.z);
                 Eigen::Quaterniond quat(linkPose.rot.w, linkPose.rot.x, linkPose.rot.y, linkPose.rot.z);
+                quat.normalize();
                 publishMesh("roboy_models", "xylophone/meshes/CAD", (link_name + ".stl").c_str(), pos, quat, 0.001,
                             "world", "xyl", i++, 1);
                 // ROS_INFO_STREAM("  " << link_name<< " "<<link->GetWorldPose());
