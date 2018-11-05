@@ -127,14 +127,14 @@ class Robot(Xylophone):
 
         if note < 67:
             try:
-                current_ik = self.get_ik.call("palm", 1, 'palm', current_pose)
+                current_ik = self.get_ik.call("left_hand", 1, 'left_hand', current_pose)
                 # print(current_ik)
                 self.move_arm(current_ik, self.left_arm_publisher)
             except:
                 print("Couldn't solve ik for note %s" %self.notes_dict[note])
         else:
             try:
-                current_ik = self.get_ik.call("right_palm", 1, 'right_palm', current_pose)
+                current_ik = self.get_ik.call("right_hand", 1, 'right_hand', current_pose)
                 # print(current_ik)
                 self.move_arm(current_ik, self.right_arm_publisher)
             except:
@@ -154,8 +154,8 @@ class Robot(Xylophone):
         right_arm_home_pose.position.z = right_arm_pos[0][2]+how_high
 
         # get ik and move to home
-        left_arm_ik = self.get_ik.call("palm", 1, "palm", left_arm_home_pose)
-        right_arm_ik = self.get_ik.call("right_palm", 1, "right_palm", right_arm_home_pose)
+        left_arm_ik = self.get_ik.call("left_hand", 1, "left_hand", left_arm_home_pose)
+        right_arm_ik = self.get_ik.call("right_hand", 1, "right_hand", right_arm_home_pose)
         self.move_arm(left_arm_ik, self.left_arm_publisher)
         self.move_arm(right_arm_ik, self.right_arm_publisher)
 
@@ -172,9 +172,10 @@ if __name__ == '__main__':
 
     # define home pos
     home_pos = (xyl.get_key_pos('F_0'), xyl.get_key_pos('F_2'))
-
+    print(home_pos)
     roboy.home(home_pos)
 
+    """
     for i in range(20):
         rand_note = np.random.randint(48, 84)
         current_key_pos = xyl.get_key_pos(xyl.notes_dict[rand_note])
@@ -184,7 +185,7 @@ if __name__ == '__main__':
         rate.sleep()
         roboy.home(home_pos)
         short_rate.sleep()
-
+    """
     """
     # good for testing if ik for all notes can be solved
     for note in xyl.notes_list[20:]:
