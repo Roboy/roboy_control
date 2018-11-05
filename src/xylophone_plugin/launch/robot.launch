@@ -3,13 +3,14 @@
     <arg name="start_controllers" default="sphere_axis0 sphere_axis1 sphere_axis2"/>
     <arg name="gazebo" default="false"/>
     <arg name="paused" default="false"/>
-    <arg name="use_sim_time" default="true"/>
+    <arg name="use_sim_time" default="false"/>
     <arg name="gui" default="false"/>
     <arg name="headless" default="false"/>
     <arg name="debug" default="false"/>
     <arg name="xylophone" default="false"/>
+    <arg name="external_robot_state" default="false"/>
 
-    <param name="git statuscd" type="string" value="$(arg robot_name)"  />
+    <param name="robot_name" type="string" value="$(arg robot_name)"  />
 
     <!--XYLOPHONE MODEL-->
     <!--<param name="robot_description" textfile="$(find roboy_models)/roboy_xylophone/model.urdf" />-->
@@ -24,6 +25,7 @@
     <param name="cardsflow_xml" type="string" value="$(find robots)/$(arg robot_name)/cardsflow.xml" />
     <rosparam file="$(find robots)/$(arg robot_name)/config/controller.yaml" command="load"/>
     <rosparam file="$(find robots)/$(arg robot_name)/config/endeffectors.yaml" command="load"/>
+    <param name="external_robot_state" type="bool" value="$(arg external_robot_state)"/>
 
     <param name="Kp" type="double" value="100"  />
     <param name="Kd" type="double" value="10"  />
@@ -48,7 +50,6 @@
           type="$(arg robot_name)"
           respawn="false"
           output="screen"
-          launch-prefix="gdb -ex run"
     />
 
     <group if="$(arg gazebo)">
@@ -64,7 +65,7 @@
         /-->
         <group if="$(arg xylophone)">
             <node name="sdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
-                  args="-sdf -file $(find roboy_models)/xylophone/model.sdf -model xylophone
+                  args="-sdf -file $(find xylophone_plugin)/xylophone/model.sdf -model xylophone
                               -x 0.0 -y -0.4 -z 0.05
                               -R 0.0 -P 0 -Y +3.07"
             />
