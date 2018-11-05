@@ -9,7 +9,7 @@
     <arg name="debug" default="false"/>
     <arg name="xylophone" default="false"/>
 
-    <param name="robot_name" type="string" value="$(arg robot_name)"  />
+    <param name="git statuscd" type="string" value="$(arg robot_name)"  />
 
     <!--XYLOPHONE MODEL-->
     <!--<param name="robot_description" textfile="$(find roboy_models)/roboy_xylophone/model.urdf" />-->
