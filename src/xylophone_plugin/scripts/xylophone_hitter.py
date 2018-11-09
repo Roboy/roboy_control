@@ -87,29 +87,31 @@ class Xylophone():
 class Robot(Xylophone):
     def __init__(self):
         Xylophone.__init__(self)
+        self.queue_size = 10
         self.get_ik = rospy.ServiceProxy('/ik', roboy_communication_middleware.srv.InverseKinematics)
         self.tf_listener = tf.TransformListener()
         self.marker_publ = rospy.Publisher('stick_visualization', Marker, queue_size=100)
         self.rate = rospy.Rate(0.5)
+        self.hit_rate = rospy.Rate(0.1)
 
         # left arm
-        self.sphere_left_axis0_publ = rospy.Publisher('/sphere_left_axis0/sphere_left_axis0/target', std_msgs.msg.Float32, queue_size=1)
-        self.sphere_left_axis1_publ = rospy.Publisher('/sphere_left_axis1/sphere_left_axis1/target', std_msgs.msg.Float32, queue_size=1)
-        self.sphere_left_axis2_publ = rospy.Publisher('/sphere_left_axis2/sphere_left_axis2/target', std_msgs.msg.Float32, queue_size=1)
-        self.elbow_left_rot0_publ = rospy.Publisher('/elbow_left_rot0/elbow_left_rot0/target', std_msgs.msg.Float32, queue_size=1)
-        self.elbow_left_rot1_publ = rospy.Publisher('/elbow_left_rot1/elbow_left_rot1/target', std_msgs.msg.Float32, queue_size=1)
-        self.left_wrist_0_publ = rospy.Publisher('/left_wrist_0/left_wrist_0/target', std_msgs.msg.Float32, queue_size=1)
-        self.left_wrist_1_publ = rospy.Publisher('/left_wrist_1/left_wrist_1/target', std_msgs.msg.Float32, queue_size=1)
-        self.left_stick_joint_publ = rospy.Publisher('/left_stick_tip_joint/left_stick_tip_joint/target', std_msgs.msg.Float32, queue_size=1)
+        self.sphere_left_axis0_publ = rospy.Publisher('/sphere_left_axis0/sphere_left_axis0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.sphere_left_axis1_publ = rospy.Publisher('/sphere_left_axis1/sphere_left_axis1/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.sphere_left_axis2_publ = rospy.Publisher('/sphere_left_axis2/sphere_left_axis2/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.elbow_left_rot0_publ = rospy.Publisher('/elbow_left_rot0/elbow_left_rot0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.elbow_left_rot1_publ = rospy.Publisher('/elbow_left_rot1/elbow_left_rot1/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.left_wrist_0_publ = rospy.Publisher('/left_wrist_0/left_wrist_0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.left_wrist_1_publ = rospy.Publisher('/left_wrist_1/left_wrist_1/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.left_stick_joint_publ = rospy.Publisher('/left_stick_tip_joint/left_stick_tip_joint/target', std_msgs.msg.Float32, queue_size=self.queue_size)
         # right arm
-        self.sphere_right_axis0_publ = rospy.Publisher('/sphere_right_axis0/sphere_right_axis0/target', std_msgs.msg.Float32, queue_size=1)
-        self.sphere_right_axis1_publ = rospy.Publisher('/sphere_right_axis1/sphere_right_axis1/target', std_msgs.msg.Float32, queue_size=1)
-        self.sphere_right_axis2_publ = rospy.Publisher('/sphere_right_axis2/sphere_right_axis2/target', std_msgs.msg.Float32, queue_size=1)
-        self.elbow_right_rot0_publ = rospy.Publisher('/elbow_right_rot0/elbow_right_rot0/target', std_msgs.msg.Float32, queue_size=1)
-        self.elbow_right_rot1_publ = rospy.Publisher('/elbow_right_rot1/elbow_right_rot1/target', std_msgs.msg.Float32, queue_size=1)
-        self.right_wrist_0_publ = rospy.Publisher('/right_wrist_0/right_wrist_0/target', std_msgs.msg.Float32, queue_size=1)
-        self.right_wrist_1_publ = rospy.Publisher('/right_wrist_1/right_wrist_1/target', std_msgs.msg.Float32, queue_size=1)
-        self.right_stick_joint_publ = rospy.Publisher('/right_stick_tip_joint/right_stick_tip_joint/target', std_msgs.msg.Float32, queue_size=1)
+        self.sphere_right_axis0_publ = rospy.Publisher('/sphere_right_axis0/sphere_right_axis0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.sphere_right_axis1_publ = rospy.Publisher('/sphere_right_axis1/sphere_right_axis1/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.sphere_right_axis2_publ = rospy.Publisher('/sphere_right_axis2/sphere_right_axis2/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.elbow_right_rot0_publ = rospy.Publisher('/elbow_right_rot0/elbow_right_rot0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.elbow_right_rot1_publ = rospy.Publisher('/elbow_right_rot1/elbow_right_rot1/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.right_wrist_0_publ = rospy.Publisher('/right_wrist_0/right_wrist_0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.right_wrist_1_publ = rospy.Publisher('/right_wrist_1/right_wrist_1/target', std_msgs.msg.Float32, queue_size=self.queue_size)
+        self.right_stick_joint_publ = rospy.Publisher('/right_stick_tip_joint/right_stick_tip_joint/target', std_msgs.msg.Float32, queue_size=self.queue_size)
 
         self.left_stick_publisher = [self.sphere_left_axis0_publ, self.sphere_left_axis1_publ,self.sphere_left_axis2_publ,
                                     self.elbow_left_rot0_publ, self.elbow_left_rot1_publ,
@@ -169,25 +171,41 @@ class Robot(Xylophone):
             publ.publish(temp_msg)
         # print("PUBLISHED IK TO JOINTS")
 
-    def hit_motion(self, angle, arm_publisher):
-        angle_rad = (angle*np.pi)/180
-        msg = std_msgs.msg.Float32()
-        msg.data = angle_rad
-        arm_publisher.publish(msg)
+    def hit_motion(self, publishers, angles=(0., 0.)):
+        (angle1, angle2) = angles
+        print(angle1, angle2)
+        (publisher1, publisher2) = publishers
+        angle1_rad = (angle1*np.pi)/180
+        angle2_rad = (angle2*np.pi)/180
+        msg1 = std_msgs.msg.Float32()
+        msg2 = std_msgs.msg.Float32()
+        msg1.data = angle1_rad
+        msg2.data = angle2_rad
+        # publish hit
+        publisher2.publish(msg2)
+        publisher1.publish(msg1)
 
-    def hit_key(self, note, key_pos, how_high=0.2, how_y=0.3):
+    def hit_key(self, note, key_pos):
         # action to make roboy hit key
+        prepare_height = 0.4
+        prepare_y = 0.15
         prepare_hit_pose = geometry_msgs.msg.Pose()
         prepare_hit_pose.position.x = key_pos[0][0]
-        prepare_hit_pose.position.y = key_pos[0][1]#+how_y
-        prepare_hit_pose.position.z = key_pos[0][2]#+how_high
+        prepare_hit_pose.position.y = key_pos[0][1] + prepare_y
+        prepare_hit_pose.position.z = key_pos[0][2] + prepare_height
+
         hit_pose = geometry_msgs.msg.Pose()
 
         if note < 66:
             # left hand
             try:
+                # go to prepare hit pose
                 current_ik = self.get_ik.call("left_stick_tip", 1, 'left_stick_tip', prepare_hit_pose)  # ; print(current_ik)
                 self.move_arm(current_ik, self.left_stick_publisher); self.rate.sleep()
+                # hit
+                self.hit_motion((self.left_wrist_0_publ, self.left_wrist_1_publ), angles=(-60., -20.)); self.hit_rate.sleep()
+                # return to prepare hit pose
+                self.hit_motion((self.left_wrist_0_publ, self.left_wrist_1_publ))
             except:
                 print("Couldn't solve ik for note %s" % self.notes_dict[note])
 
@@ -196,6 +214,8 @@ class Robot(Xylophone):
             try:
                 current_ik = self.get_ik.call("right_stick_tip", 1, 'right_stick_tip', prepare_hit_pose)  # ; print(current_ik)
                 self.move_arm(current_ik, self.right_stick_publisher); self.rate.sleep()
+                self.hit_motion(60., self.right_wrist_0_publ); self.hit_rate.sleep()
+                self.hit_motion(0., self.right_wrist_0_publ)
             except:
                 print("Couldn't solve ik for note %s" % self.notes_dict[note])
 
@@ -205,12 +225,12 @@ class Robot(Xylophone):
         # initialize poses
         left_arm_home_pose = geometry_msgs.msg.Pose()
         left_arm_home_pose.position.x = left_arm_pos[0][0]
-        left_arm_home_pose.position.y = left_arm_pos[0][1]+how_y
-        left_arm_home_pose.position.z = left_arm_pos[0][2]+how_high
+        left_arm_home_pose.position.y = left_arm_pos[0][1] + how_y
+        left_arm_home_pose.position.z = left_arm_pos[0][2] + how_high
         right_arm_home_pose = geometry_msgs.msg.Pose()
         right_arm_home_pose.position.x = right_arm_pos[0][0]
-        right_arm_home_pose.position.y = right_arm_pos[0][1]+how_y
-        right_arm_home_pose.position.z = right_arm_pos[0][2]+how_high
+        right_arm_home_pose.position.y = right_arm_pos[0][1] + how_y
+        right_arm_home_pose.position.z = right_arm_pos[0][2] + how_high
 
         # get ik and move to home
         left_arm_ik = self.get_ik.call("left_stick_tip", 1, "left_hand", left_arm_home_pose)
@@ -232,24 +252,14 @@ if __name__ == '__main__':
 
     # define home pos
     home_pos = (xyl.get_key_pos('F_0'), xyl.get_key_pos('F_2'))
-    # print(home_pos)
     roboy.home(home_pos)
     long_rate.sleep()
 
-    # # right ball
-    # right_stick_pos = roboy.ball_pos("right_hand", "wrist_right_1")
-    # show_marker_world(right_stick_pos, marker_publisher, frame='world'); long_rate.sleep()
-    #
-    # #left ball
-    # left_stick_pos = roboy.ball_pos("left_hand", "wrist_left_1")
-    # show_marker_world(left_stick_pos, marker_publisher, frame='world'); long_rate.sleep()
-
-
-    for i in range(25):
+    for i in range(8):
         rand_note = np.random.randint(48, 84)  # 48-84
-        # rand_note = 48
+        rand_note = 48
         current_key_pos = xyl.get_key_pos(xyl.notes_dict[rand_note])
-        # print("position of %s" %xyl.notes_dict[rand_note], current_key_pos)
+        print("position of %s" %xyl.notes_dict[rand_note], current_key_pos)
         show_marker(current_key_pos, marker_publisher)
         roboy.hit_key(rand_note, current_key_pos)
         rate.sleep()
