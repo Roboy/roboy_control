@@ -1,3 +1,15 @@
 [submodule "src/CARDSflow"]
 	path = src/CARDSflow
 	url = https://github.com/cardsflow/CARDSflow
+[submodule "src/roboy_plexus"]
+	path = src/roboy_plexus
+	url = https://github.com/Roboy/roboy_plexus
+[submodule "src/roboy_rqt_plugins"]
+	path = src/roboy_rqt_plugins
+	url = https://github.com/Roboy/roboy_rqt_plugins
+[submodule "src/ball_in_socket_estimator"]
+	path = src/ball_in_socket_estimator
+	url = https://github.com/Roboy/ball_in_socket_estimator
+[submodule "src/roboy_state_estimator"]
+	path = src/roboy_state_estimator
+	url = https://github.com/Roboy/roboy_state_estimator
