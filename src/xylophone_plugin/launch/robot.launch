@@ -50,6 +50,7 @@
           type="$(arg robot_name)"
           respawn="false"
           output="screen"
+
     />
 
     <group if="$(arg gazebo)">
@@ -66,7 +67,7 @@
         <group if="$(arg xylophone)">
             <node name="sdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
                   args="-sdf -file $(find xylophone_plugin)/xylophone/model.sdf -model xylophone
-                              -x 0.0 -y -0.6 -z 0.00
+                              -x 0.0 -y -0.5 -z 0.00
                               -R 0.0 -P 0 -Y +3.07"
             />
         </group>

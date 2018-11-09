@@ -99,7 +99,7 @@ public:
                 Eigen::Quaterniond quat(linkPose.rot.w, linkPose.rot.x, linkPose.rot.y, linkPose.rot.z);
                 quat.normalize();
                 publishMesh("roboy_models", "xylophone/meshes/CAD", (link_name + ".stl").c_str(), pos, quat, 0.001,
-                            "world", "xyl", i++, 1, 0.8);
+                            "world", "xyl", i++, 1, COLOR(1,1,1,0.8));
                 // ROS_INFO_STREAM("  " << link_name<< " "<<link->GetWorldPose());
             }
             last_update = ros::Time::now();
