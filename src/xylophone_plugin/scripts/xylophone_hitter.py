@@ -200,10 +200,11 @@ class Robot(Xylophone):
             # left hand
             try:
                 # go to prepare hit pose
-                current_ik = self.get_ik.call("left_stick_tip", 1, 'left_stick_tip', prepare_hit_pose)  # ; print(current_ik)
+                current_ik = self.get_ik.call("left_stick_tip", 1, 'left_stick_tip', prepare_hit_pose)
                 self.move_arm(current_ik, self.left_stick_publisher); self.rate.sleep()
                 # hit
-                self.hit_motion((self.left_wrist_0_publ, self.left_wrist_1_publ), angles=(-60., -20.)); self.hit_rate.sleep()
+                self.hit_motion((self.left_wrist_0_publ, self.left_wrist_1_publ), angles=(-40., 10.))
+                self.hit_rate.sleep()
                 # return to prepare hit pose
                 self.hit_motion((self.left_wrist_0_publ, self.left_wrist_1_publ))
             except:
@@ -212,10 +213,14 @@ class Robot(Xylophone):
         else:
             # right hand
             try:
-                current_ik = self.get_ik.call("right_stick_tip", 1, 'right_stick_tip', prepare_hit_pose)  # ; print(current_ik)
+                # go to prepare hit pose
+                current_ik = self.get_ik.call("right_stick_tip", 1, 'right_stick_tip', prepare_hit_pose)
                 self.move_arm(current_ik, self.right_stick_publisher); self.rate.sleep()
-                self.hit_motion(60., self.right_wrist_0_publ); self.hit_rate.sleep()
-                self.hit_motion(0., self.right_wrist_0_publ)
+                # hit
+                self.hit_motion((self.right_wrist_0_publ, self.right_wrist_1_publ), angles=(40., 10.))
+                self.hit_rate.sleep()
+                # return to prepare hit pose
+                self.hit_motion((self.right_wrist_0_publ, self.right_wrist_1_publ))
             except:
                 print("Couldn't solve ik for note %s" % self.notes_dict[note])
 
@@ -233,8 +238,8 @@ class Robot(Xylophone):
         right_arm_home_pose.position.z = right_arm_pos[0][2] + how_high
 
         # get ik and move to home
-        left_arm_ik = self.get_ik.call("left_stick_tip", 1, "left_hand", left_arm_home_pose)
-        right_arm_ik = self.get_ik.call("right_stick_tip", 1, "right_hand", right_arm_home_pose)
+        left_arm_ik = self.get_ik.call("left_stick_tip", 1, "left_stick_tip", left_arm_home_pose)
+        right_arm_ik = self.get_ik.call("right_stick_tip", 1, "right_stick_tip", right_arm_home_pose)
         self.move_arm(left_arm_ik, self.left_hand_publisher)
         self.move_arm(right_arm_ik, self.right_hand_publisher)
 
@@ -255,9 +260,9 @@ if __name__ == '__main__':
     roboy.home(home_pos)
     long_rate.sleep()
 
-    for i in range(8):
+    for i in range(6):
         rand_note = np.random.randint(48, 84)  # 48-84
-        rand_note = 48
+        # rand_note = 48+i
         current_key_pos = xyl.get_key_pos(xyl.notes_dict[rand_note])
         print("position of %s" %xyl.notes_dict[rand_note], current_key_pos)
         show_marker(current_key_pos, marker_publisher)
@@ -265,14 +270,3 @@ if __name__ == '__main__':
         rate.sleep()
         roboy.home(home_pos)
         rate.sleep()
-
-    """
-    # good for testing if ik for all notes can be solved
-    for note in xyl.notes_list[20:]:
-        print(note)
-        current_key_pos = xyl.get_key_pos(note)
-        print("position of %s" %note, current_key_pos)
-        show_marker(current_key_pos, marker_publisher)
-        xyl.hit_key(note, current_key_pos)
-        rate.sleep()
-    """
