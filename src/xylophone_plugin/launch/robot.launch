@@ -12,14 +12,7 @@
 
     <param name="robot_name" type="string" value="$(arg robot_name)"  />
 
-    <!--XYLOPHONE MODEL-->
-    <!--<param name="robot_description" textfile="$(find roboy_models)/roboy_xylophone/model.urdf" />-->
-    <!--<param name="urdf_file_path" type="string" value="$(find roboy_models)/roboy_xylophone/model.urdf" />-->
-    <!--<param name="cardsflow_xml" type="string" value="$(find roboy_models)/roboy_xylophone/cardsflow.xml" />-->
-    <!--<rosparam file="$(find roboy_models)/roboy_xylophone/config/controller.yaml" command="load"/>-->
-    <!--<rosparam file="$(find roboy_models)/roboy_xylophone/config/endeffectors.yaml" command="load"/>-->
 
-    <!--UPPER BODY MODEL-->
     <param name="robot_description" textfile="$(find robots)/$(arg robot_name)/model.urdf" />
     <param name="urdf_file_path" type="string" value="$(find robots)/$(arg robot_name)/model.urdf" />
     <param name="cardsflow_xml" type="string" value="$(find robots)/$(arg robot_name)/cardsflow.xml" />
