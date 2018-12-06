@@ -10,3 +10,6 @@
 [submodule "src/roboy_state_estimator"]
 	path = src/roboy_state_estimator
 	url = https://github.com/Roboy/roboy_state_estimator
+[submodule "src/CARDSflow"]
+	path = src/CARDSflow
+	url = https://github.com/CARDSflow/CARDSflow
