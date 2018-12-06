@@ -1,6 +1,3 @@
-[submodule "src/CARDSflow"]
-	path = src/CARDSflow
-	url = https://github.com/cardsflow/CARDSflow
 [submodule "src/roboy_plexus"]
 	path = src/roboy_plexus
 	url = https://github.com/Roboy/roboy_plexus
