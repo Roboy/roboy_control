@@ -3,11 +3,11 @@
 import rospy
 #import threading
 import std_srvs.srv, geometry_msgs.msg, std_msgs.msg
-import roboy_communication_middleware.srv
+import roboy_middleware_msgs.srv
 import tf
 from visualization_msgs.msg import Marker
 import numpy as np
-import pyquaternion
+# import pyquaternion
 
 
 def show_marker(pose, publisher, color=(1,0,0,1), sphereSize=0.05, frame='world', is_pose=False):
@@ -56,6 +56,7 @@ def show_marker(pose, publisher, color=(1,0,0,1), sphereSize=0.05, frame='world'
     # print("marker published")
 
 
+
 class Xylophone():
     def __init__(self):
         # TODO change C_sharo_0 to C_sharp_0 and change note names to the correct octave
@@ -88,11 +89,13 @@ class Robot(Xylophone):
     def __init__(self):
         Xylophone.__init__(self)
         self.queue_size = 10
-        self.get_ik = rospy.ServiceProxy('/ik', roboy_communication_middleware.srv.InverseKinematics)
+        self.get_ik = rospy.ServiceProxy('/ik', roboy_middleware_msgs.srv.InverseKinematics)
         self.tf_listener = tf.TransformListener()
         self.marker_publ = rospy.Publisher('stick_visualization', Marker, queue_size=100)
         self.rate = rospy.Rate(0.5)
         self.hit_rate = rospy.Rate(0.1)
+        self.sequence = np.zeros((96,60))
+        self.clock = 0
 
         # left arm
         self.sphere_left_axis0_publ = rospy.Publisher('/sphere_left_axis0/sphere_left_axis0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
@@ -243,6 +246,16 @@ class Robot(Xylophone):
         self.move_arm(left_arm_ik, self.left_hand_publisher)
         self.move_arm(right_arm_ik, self.right_hand_publisher)
 
+    def sequence_callback(self, matrix):
+        self.sequence = matrix.data.reshape((matrix.data.shape[0]/128,128))
+
+    def clock_callback(self, tick):
+        self.clock = tick.data
+        print(self.clock)
+
+    def subscriber(self):
+        rospy.Subscriber("vae_clock", Int32, roboy.clock_callback)
+        rospy.spin()
 
 if __name__ == '__main__':
     rospy.init_node('xylophone_hitter')
@@ -260,13 +273,42 @@ if __name__ == '__main__':
     roboy.home(home_pos)
     long_rate.sleep()
 
-    for i in range(6):
-        rand_note = np.random.randint(48, 84)  # 48-84
-        # rand_note = 48+i
-        current_key_pos = xyl.get_key_pos(xyl.notes_dict[rand_note])
-        print("position of %s" %xyl.notes_dict[rand_note], current_key_pos)
-        show_marker(current_key_pos, marker_publisher)
-        roboy.hit_key(rand_note, current_key_pos)
-        rate.sleep()
-        roboy.home(home_pos)
-        rate.sleep()
+    # read sequence from vae gui
+    import rospy
+    from rospy.numpy_msg import numpy_msg
+    from std_msgs.msg import Float32MultiArray, Int32
+
+    print("I am awaiting an input sequence...")
+    while True:
+        rospy.Subscriber("vae_sequence", numpy_msg(Float32MultiArray), roboy.sequence_callback)
+        # print(roboy.sequence.any())
+        if roboy.sequence.any():
+            break
+    print("That was a cool improvisation!!")
+    print("received sequence {}".format(roboy.sequence))
+    print("is sequence != 0: {}".format(roboy.sequence.any()))
+
+    #get bpm
+    
+    play_tick = -1
+    while True:
+        rospy.Subscriber("vae_clock", Int32, roboy.clock_callback)
+        # roboy.subscriber()
+        print(roboy.clock)
+        # if roboy.clock > play_tick:
+        #     play_tick = roboy.clock
+        #     print(play_tick)
+        if play_tick >= roboy.sequence.shape[0]-1:
+            break
+
+
+    # for i in range(6):
+    #     rand_note = np.random.randint(48, 84)  # 48-84
+    #     # rand_note = 48+i
+    #     current_key_pos = xyl.get_key_pos(xyl.notes_dict[rand_note])
+    #     print("position of %s" %xyl.notes_dict[rand_note], current_key_pos)
+    #     show_marker(current_key_pos, marker_publisher)
+    #     roboy.hit_key(rand_note, current_key_pos)
+    #     rate.sleep()
+    #     roboy.home(home_pos)
+    #     rate.sleep()
