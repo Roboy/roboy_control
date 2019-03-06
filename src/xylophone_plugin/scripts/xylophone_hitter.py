@@ -103,9 +103,15 @@ class Robot(Xylophone):
         self.hit_rate = rospy.Rate(0.1)
         self.sequence = np.zeros((96,60))
         self.midi_msg = 0
-        self.hit_thread = threading.Thread(target=self.hit_key)
-        self.hit_thread.setDaemon(True)
+        self.hit_thread_left = threading.Thread(target=self.hit_key, args=('left',))
+        self.hit_thread_left.setDaemon(True)
+        self.hit_thread_right = threading.Thread(target=self.hit_key, args=('right',))
+        self.hit_thread_right.setDaemon(True)
         self.home_pos = 0
+        self.action_client_left = actionlib.SimpleActionClient('CARDSflow/MoveEndEffector/left_stick_tip',
+                                                                    MoveEndEffectorAction)
+        self.action_client_right = actionlib.SimpleActionClient('CARDSflow/MoveEndEffector/right_stick_tip',
+                                                                    MoveEndEffectorAction)
 
         # left arm
         self.sphere_left_axis0_publ = rospy.Publisher('/sphere_left_axis0/sphere_left_axis0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
@@ -134,8 +140,6 @@ class Robot(Xylophone):
                                     self.right_wrist_0_publ, self.right_wrist_1_publ, self.right_stick_joint_publ]
         self.left_hand_publisher = self.left_stick_publisher[:-1]
         self.right_hand_publisher = self.right_stick_publisher[:-1]
-        self.client = actionlib.SimpleActionClient('CARDSflow/MoveEndEffector/left_stick_tip',
-                                                                    MoveEndEffectorAction)
         print("Publishers for links were initialized")
 
     def get_transform(self, frame1, frame2):
@@ -169,7 +173,7 @@ class Robot(Xylophone):
         publisher2.publish(msg2)
         publisher1.publish(msg1)
 
-    def hit_key(self):
+    def hit_key(self, left_or_right):
         # action to make roboy hit key
         note = self.midi_msg[1]
         if note >= 36 and note <= 48:
@@ -177,7 +181,7 @@ class Robot(Xylophone):
         if note >= 86 and note <= 98:
             note-=12
         key_pos = self.key_positions[note-48]
-        prepare_height = 0.1#0.4
+        prepare_height = 0.#0.4
         prepare_y = 0.#0.15
         prepare_hit_pose = geometry_msgs.msg.Pose()
         prepare_hit_pose.position.x = key_pos[0][0]
@@ -186,24 +190,41 @@ class Robot(Xylophone):
         hit_pose = geometry_msgs.msg.Pose()
 
         # left hand
-        if note < 66:
-            self.client.wait_for_server()
+        if left_or_right == 'left':
+            self.action_client_left.wait_for_server()
+            # hit key
             goal = MoveEndEffectorGoal(endeffector='left_stick_tip',
                                             type=0, ik_type=1, pose=prepare_hit_pose,
                                             target_frame='left_stick_tip',
-                                            timeout=30, tolerance=0.01)
-            self.client.send_goal(goal)
-            self.client.wait_for_result(rospy.Duration.from_sec(1.0))
+                                            timeout=30, tolerance=0.)
+            self.action_client_left.send_goal(goal)
+            self.action_client_left.wait_for_result(rospy.Duration.from_sec(2.5))
+            prepare_hit_pose.position.z += 0.1
+            goal = MoveEndEffectorGoal(endeffector='left_stick_tip',
+                                            type=0, ik_type=1, pose=prepare_hit_pose,
+                                            target_frame='left_stick_tip',
+                                            timeout=30, tolerance=0.1)
+            self.action_client_left.send_goal(goal)
+            self.action_client_left.wait_for_result(rospy.Duration.from_sec(0.5))
+
         # right hand
         else:
-            self.client.wait_for_server()
+            self.action_client_right.wait_for_server()
+            # hit key
             goal = MoveEndEffectorGoal(endeffector='right_stick_tip',
                                             type=0, ik_type=1, pose=prepare_hit_pose,
                                             target_frame='right_stick_tip',
-                                            timeout=30, tolerance=0.01)
-            self.client.send_goal(goal)
-            self.client.wait_for_result(rospy.Duration.from_sec(1.0))
-        print("script done")
+                                            timeout=30, tolerance=0.)
+            self.action_client_right.send_goal(goal)
+            self.action_client_right.wait_for_result(rospy.Duration.from_sec(2.5))
+            prepare_hit_pose.position.z += 0.1
+            goal = MoveEndEffectorGoal(endeffector='right_stick_tip',
+                                            type=0, ik_type=1, pose=prepare_hit_pose,
+                                            target_frame='right_stick_tip',
+                                            timeout=30, tolerance=0.1)
+            self.action_client_right.send_goal(goal)
+            self.action_client_right.wait_for_result(rospy.Duration.from_sec(0.5))
+
 
     def home(self, how_high=0.15, how_y=0.2):
         # moves arms to home position above xylophone
@@ -225,10 +246,16 @@ class Robot(Xylophone):
 
     def midi_callback(self, midi_msg):
         self.midi_msg = midi_msg.data
-        if not self.hit_thread.is_alive():
-            self.hit_thread = threading.Thread(target=self.hit_key)
-            self.hit_thread.setDaemon(True)
-            self.hit_thread.start()
+        if self.midi_msg[1] < 66:
+            if not self.hit_thread_left.is_alive():
+                self.hit_thread_left = threading.Thread(target=self.hit_key, args=('left',))
+                self.hit_thread_left.setDaemon(True)
+                self.hit_thread_left.start()
+        else:
+            if not self.hit_thread_left.is_alive():
+                self.hit_thread_left = threading.Thread(target=self.hit_key, args=('right',))
+                self.hit_thread_left.setDaemon(True)
+                self.hit_thread_left.start()
 
 
     def play(self):
