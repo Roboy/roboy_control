@@ -1,14 +1,17 @@
 #! /usr/bin/env python
 
 import rospy
-#import threading
+import threading
 import std_srvs.srv, geometry_msgs.msg, std_msgs.msg
 import roboy_middleware_msgs.srv
+from roboy_control_msgs.msg import MoveEndEffectorAction, MoveEndEffectorResult, MoveEndEffectorGoal
 import tf
 from visualization_msgs.msg import Marker
 import numpy as np
-# import pyquaternion
-
+import rospy
+from rospy.numpy_msg import numpy_msg
+from std_msgs.msg import Int32MultiArray
+import actionlib
 
 def show_marker(pose, publisher, color=(1,0,0,1), sphereSize=0.05, frame='world', is_pose=False):
     rate3 = rospy.Rate(10)
@@ -72,6 +75,7 @@ class Xylophone():
                            72: 'C_2', 73: 'C_sharp_2', 74: 'D_2', 75: 'D_sharp_2', 76: 'E_2', 77: 'F_2',
                            78: 'F_sharp_2', 79: 'G_2', 80: 'G_sharp_2', 81: 'A_2', 82: 'A_sharp_2', 83: 'H_2', 84: 'C_3'}
         self.key_pos_listener = tf.TransformListener()
+        self.key_positions = []
 
     def get_key_pos(self, key):
         # get key positions
@@ -84,6 +88,9 @@ class Xylophone():
             print("couldn't find lookup transform of %s frame" %key)
         return position
 
+    def save_key_positions(self):
+        for key in self.notes_list:
+            self.key_positions.append(self.get_key_pos(key))
 
 class Robot(Xylophone):
     def __init__(self):
@@ -95,7 +102,10 @@ class Robot(Xylophone):
         self.rate = rospy.Rate(0.5)
         self.hit_rate = rospy.Rate(0.1)
         self.sequence = np.zeros((96,60))
-        self.clock = 0
+        self.midi_msg = 0
+        self.hit_thread = threading.Thread(target=self.hit_key)
+        self.hit_thread.setDaemon(True)
+        self.home_pos = 0
 
         # left arm
         self.sphere_left_axis0_publ = rospy.Publisher('/sphere_left_axis0/sphere_left_axis0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
@@ -124,38 +134,9 @@ class Robot(Xylophone):
                                     self.right_wrist_0_publ, self.right_wrist_1_publ, self.right_stick_joint_publ]
         self.left_hand_publisher = self.left_stick_publisher[:-1]
         self.right_hand_publisher = self.right_stick_publisher[:-1]
+        self.client = actionlib.SimpleActionClient('CARDSflow/MoveEndEffector/left_stick_tip',
+                                                                    MoveEndEffectorAction)
         print("Publishers for links were initialized")
-
-    def show_marker_world(self, position, publisher, color=(0,1,0,1), sphere_size=0.05, frame='world', is_pose=False):
-        rate3 = rospy.Rate(10)
-        rate3.sleep()
-        marker = Marker()
-        marker.header.frame_id = frame
-        marker.ns = 'keys_visualization'
-        marker.type = Marker.SPHERE
-        if not is_pose:
-            marker.pose.position.x = position[0]
-            marker.pose.position.y = position[1]
-            marker.pose.position.z = position[2]
-            marker.pose.orientation.x = 0
-            marker.pose.orientation.y = 0
-            marker.pose.orientation.z = 0
-            marker.pose.orientation.w = 1
-        else:
-            marker.pose = position
-
-        marker.color.r = color[0]
-        marker.color.g = color[1]
-        marker.color.b = color[2]
-        marker.color.a = color[3]
-        marker.scale.x = sphere_size
-        marker.scale.y = sphere_size
-        marker.scale.z = sphere_size
-        marker.lifetime = rospy.Duration(10)
-        marker.header.stamp = rospy.Time.now()
-        marker.action = Marker.ADD
-        marker.id = 101
-        publisher.publish(marker)
 
     def get_transform(self, frame1, frame2):
         trans, rot = [0, 0, 0], [0, 0, 0, 1]
@@ -188,49 +169,45 @@ class Robot(Xylophone):
         publisher2.publish(msg2)
         publisher1.publish(msg1)
 
-    def hit_key(self, note, key_pos):
+    def hit_key(self):
         # action to make roboy hit key
-        prepare_height = 0.4
-        prepare_y = 0.15
+        note = self.midi_msg[1]
+        if note >= 36 and note <= 48:
+            note+=12
+        if note >= 86 and note <= 98:
+            note-=12
+        key_pos = self.key_positions[note-48]
+        prepare_height = 0.1#0.4
+        prepare_y = 0.#0.15
         prepare_hit_pose = geometry_msgs.msg.Pose()
         prepare_hit_pose.position.x = key_pos[0][0]
         prepare_hit_pose.position.y = key_pos[0][1] + prepare_y
         prepare_hit_pose.position.z = key_pos[0][2] + prepare_height
-
         hit_pose = geometry_msgs.msg.Pose()
 
+        # left hand
         if note < 66:
-            # left hand
-            try:
-                # go to prepare hit pose
-                current_ik = self.get_ik.call("left_stick_tip", 1, 'left_stick_tip', prepare_hit_pose)
-                self.move_arm(current_ik, self.left_stick_publisher); self.rate.sleep()
-                # hit
-                self.hit_motion((self.left_wrist_0_publ, self.left_wrist_1_publ), angles=(-40., 10.))
-                self.hit_rate.sleep()
-                # return to prepare hit pose
-                self.hit_motion((self.left_wrist_0_publ, self.left_wrist_1_publ))
-            except:
-                print("Couldn't solve ik for note %s" % self.notes_dict[note])
-
+            self.client.wait_for_server()
+            goal = MoveEndEffectorGoal(endeffector='left_stick_tip',
+                                            type=0, ik_type=1, pose=prepare_hit_pose,
+                                            target_frame='left_stick_tip',
+                                            timeout=30, tolerance=0.01)
+            self.client.send_goal(goal)
+            self.client.wait_for_result(rospy.Duration.from_sec(1.0))
+        # right hand
         else:
-            # right hand
-            try:
-                # go to prepare hit pose
-                current_ik = self.get_ik.call("right_stick_tip", 1, 'right_stick_tip', prepare_hit_pose)
-                self.move_arm(current_ik, self.right_stick_publisher); self.rate.sleep()
-                # hit
-                self.hit_motion((self.right_wrist_0_publ, self.right_wrist_1_publ), angles=(40., 10.))
-                self.hit_rate.sleep()
-                # return to prepare hit pose
-                self.hit_motion((self.right_wrist_0_publ, self.right_wrist_1_publ))
-            except:
-                print("Couldn't solve ik for note %s" % self.notes_dict[note])
+            self.client.wait_for_server()
+            goal = MoveEndEffectorGoal(endeffector='right_stick_tip',
+                                            type=0, ik_type=1, pose=prepare_hit_pose,
+                                            target_frame='right_stick_tip',
+                                            timeout=30, tolerance=0.01)
+            self.client.send_goal(goal)
+            self.client.wait_for_result(rospy.Duration.from_sec(1.0))
+        print("script done")
 
-    def home(self, positions, how_high=0.15, how_y=0.2):
+    def home(self, how_high=0.15, how_y=0.2):
         # moves arms to home position above xylophone
-        (left_arm_pos, right_arm_pos) = positions
-        # initialize poses
+        (left_arm_pos, right_arm_pos) = self.home_pos
         left_arm_home_pose = geometry_msgs.msg.Pose()
         left_arm_home_pose.position.x = left_arm_pos[0][0]
         left_arm_home_pose.position.y = left_arm_pos[0][1] + how_y
@@ -246,69 +223,43 @@ class Robot(Xylophone):
         self.move_arm(left_arm_ik, self.left_hand_publisher)
         self.move_arm(right_arm_ik, self.right_hand_publisher)
 
-    def sequence_callback(self, matrix):
-        self.sequence = matrix.data.reshape((matrix.data.shape[0]/128,128))
+    def midi_callback(self, midi_msg):
+        self.midi_msg = midi_msg.data
+        if not self.hit_thread.is_alive():
+            self.hit_thread = threading.Thread(target=self.hit_key)
+            self.hit_thread.setDaemon(True)
+            self.hit_thread.start()
 
-    def clock_callback(self, tick):
-        self.clock = tick.data
-        print(self.clock)
 
-    def subscriber(self):
-        rospy.Subscriber("vae_clock", Int32, roboy.clock_callback)
+    def play(self):
+        rospy.Subscriber("midi_publisher", Int32MultiArray, self.midi_callback, queue_size=1)
         rospy.spin()
 
 if __name__ == '__main__':
     rospy.init_node('xylophone_hitter')
-    marker_publisher = rospy.Publisher('keys_visualization', Marker, queue_size=100)
 
-    xyl = Xylophone()
     roboy = Robot()
     rate = rospy.Rate(1)
     short_rate = rospy.Rate(5)
     long_rate = rospy.Rate(0.2)
     rate.sleep()  # wait 1 second for init
 
+    # get and save all key positions
+    roboy.save_key_positions()
+    # print(roboy.key_positions)
+
     # define home pos
-    home_pos = (xyl.get_key_pos('F_0'), xyl.get_key_pos('F_2'))
-    roboy.home(home_pos)
-    long_rate.sleep()
+    roboy.home_pos = (roboy.get_key_pos('F_0'), roboy.get_key_pos('F_2'))
+    roboy.home()
+    rate.sleep()
 
-    # read sequence from vae gui
-    import rospy
-    from rospy.numpy_msg import numpy_msg
-    from std_msgs.msg import Float32MultiArray, Int32
-
-    print("I am awaiting an input sequence...")
-    while True:
-        rospy.Subscriber("vae_sequence", numpy_msg(Float32MultiArray), roboy.sequence_callback)
-        # print(roboy.sequence.any())
-        if roboy.sequence.any():
-            break
-    print("That was a cool improvisation!!")
-    print("received sequence {}".format(roboy.sequence))
-    print("is sequence != 0: {}".format(roboy.sequence.any()))
-
-    #get bpm
-    
-    play_tick = -1
-    while True:
-        rospy.Subscriber("vae_clock", Int32, roboy.clock_callback)
-        # roboy.subscriber()
-        print(roboy.clock)
-        # if roboy.clock > play_tick:
-        #     play_tick = roboy.clock
-        #     print(play_tick)
-        if play_tick >= roboy.sequence.shape[0]-1:
-            break
-
+    print("I am ready to receive MIDI notes.")
+    roboy.play()
 
     # for i in range(6):
-    #     rand_note = np.random.randint(48, 84)  # 48-84
+    #     rand_note = np.random.randint(48, 65)  # 48-84
     #     # rand_note = 48+i
-    #     current_key_pos = xyl.get_key_pos(xyl.notes_dict[rand_note])
-    #     print("position of %s" %xyl.notes_dict[rand_note], current_key_pos)
-    #     show_marker(current_key_pos, marker_publisher)
-    #     roboy.hit_key(rand_note, current_key_pos)
+    #     roboy.hit_key(rand_note)
     #     rate.sleep()
-    #     roboy.home(home_pos)
+    #     roboy.home()
     #     rate.sleep()
