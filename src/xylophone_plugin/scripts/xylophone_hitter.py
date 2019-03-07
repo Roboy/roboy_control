@@ -9,55 +9,10 @@ import tf
 from visualization_msgs.msg import Marker
 import numpy as np
 import rospy
-from rospy.numpy_msg import numpy_msg
 from std_msgs.msg import Int32MultiArray
 import actionlib
-
-def show_marker(pose, publisher, color=(1,0,0,1), sphereSize=0.05, frame='world', is_pose=False):
-    rate3 = rospy.Rate(10)
-    rate3.sleep()
-    marker = Marker()
-    marker.header.frame_id = frame
-    marker.ns = 'keys_visualization'
-    marker.type = Marker.SPHERE
-    if frame == 'world' and is_pose == False:
-        # print('show marker: world + no pose')
-        marker.pose.position.x = pose[0][0]
-        marker.pose.position.y = pose[0][1]
-        marker.pose.position.z = pose[0][2]
-        marker.pose.orientation.x = pose[1][0]
-        marker.pose.orientation.y = pose[1][1]
-        marker.pose.orientation.z = pose[1][2]
-        marker.pose.orientation.w = pose[1][3]
-    if frame == 'world' and is_pose ==True:
-        if frame == 'left_hand':
-            print('show marker: left hand + pose')
-            marker.pose = pose
-        if frame == 'right_hand':
-            print('show marker: right hand + pose')
-            marker.pose = pose
-
-    if frame is not 'world' and is_pose == False:
-        if frame == 'right_hand':
-            marker.pose.position.x = pose[0]
-            marker.pose.position.y = pose[1]
-            marker.pose.position.z = pose[2]
-
-    marker.color.r = color[0]
-    marker.color.g = color[1]
-    marker.color.b = color[2]
-    marker.color.a = color[3]
-    marker.scale.x = sphereSize
-    marker.scale.y = sphereSize
-    marker.scale.z = sphereSize
-    marker.lifetime = rospy.Duration(10)
-    marker.header.stamp = rospy.Time.now()
-    marker.action = Marker.ADD
-    marker.id = 101
-
-    publisher.publish(marker)
-    # print("marker published")
-
+import mido
+import time
 
 
 class Xylophone():
@@ -92,6 +47,7 @@ class Xylophone():
         for key in self.notes_list:
             self.key_positions.append(self.get_key_pos(key))
 
+
 class Robot(Xylophone):
     def __init__(self):
         Xylophone.__init__(self)
@@ -112,7 +68,7 @@ class Robot(Xylophone):
                                                                     MoveEndEffectorAction)
         self.action_client_right = actionlib.SimpleActionClient('CARDSflow/MoveEndEffector/right_stick_tip',
                                                                     MoveEndEffectorAction)
-
+        self.midi_outport = None
         # left arm
         self.sphere_left_axis0_publ = rospy.Publisher('/sphere_left_axis0/sphere_left_axis0/target', std_msgs.msg.Float32, queue_size=self.queue_size)
         self.sphere_left_axis1_publ = rospy.Publisher('/sphere_left_axis1/sphere_left_axis1/target', std_msgs.msg.Float32, queue_size=self.queue_size)
@@ -141,6 +97,21 @@ class Robot(Xylophone):
         self.left_hand_publisher = self.left_stick_publisher[:-1]
         self.right_hand_publisher = self.right_stick_publisher[:-1]
         print("Publishers for links were initialized")
+
+    def open_outport(self):
+        # TODO autoroute midi port to virtual synth possible??
+        avail_out_ports = mido.get_output_names()
+        ports_dict = {i: avail_out_ports[i] for i in range(len(avail_out_ports))}
+        port = None
+        for i in range(len(avail_out_ports)):
+            if "Synth input" in ports_dict[i]:  # Better way than looking for this string?
+                port = ports_dict[i]
+        if port:
+            self.midi_outport = mido.open_output(port)
+            print("Found FLUID Synth and autoconnected!")
+        else:
+            self.midi_outport = mido.open_output("Robot port", virtual=True)
+            print("Could not find FLUID Synth, created virtual midi port called 'Robot port'")
 
     def get_transform(self, frame1, frame2):
         trans, rot = [0, 0, 0], [0, 0, 0, 1]
@@ -176,10 +147,6 @@ class Robot(Xylophone):
     def hit_key(self, left_or_right):
         # action to make roboy hit key
         note = self.midi_msg[1]
-        if note >= 36 and note <= 48:
-            note+=12
-        if note >= 86 and note <= 98:
-            note-=12
         key_pos = self.key_positions[note-48]
         prepare_height = 0.#0.4
         prepare_y = 0.#0.15
@@ -196,14 +163,15 @@ class Robot(Xylophone):
             goal = MoveEndEffectorGoal(endeffector='left_stick_tip',
                                             type=0, ik_type=1, pose=prepare_hit_pose,
                                             target_frame='left_stick_tip',
-                                            timeout=30, tolerance=0.)
+                                            timeout=30, tolerance=0.1)
+            # goal.note = note
             self.action_client_left.send_goal(goal)
-            self.action_client_left.wait_for_result(rospy.Duration.from_sec(2.5))
+            self.action_client_left.wait_for_result(rospy.Duration.from_sec(5.))
             prepare_hit_pose.position.z += 0.1
             goal = MoveEndEffectorGoal(endeffector='left_stick_tip',
                                             type=0, ik_type=1, pose=prepare_hit_pose,
                                             target_frame='left_stick_tip',
-                                            timeout=30, tolerance=0.1)
+                                            timeout=30, tolerance=0.1, id=note)
             self.action_client_left.send_goal(goal)
             self.action_client_left.wait_for_result(rospy.Duration.from_sec(0.5))
 
@@ -214,19 +182,20 @@ class Robot(Xylophone):
             goal = MoveEndEffectorGoal(endeffector='right_stick_tip',
                                             type=0, ik_type=1, pose=prepare_hit_pose,
                                             target_frame='right_stick_tip',
-                                            timeout=30, tolerance=0.)
+                                            timeout=30, tolerance=0.1)
             self.action_client_right.send_goal(goal)
-            self.action_client_right.wait_for_result(rospy.Duration.from_sec(2.5))
+            self.action_client_right.wait_for_result(rospy.Duration.from_sec(5.))
+            # rospy.Subscriber("/CARDSflow/MoveEndEffector/right_stick_tip/result")
             prepare_hit_pose.position.z += 0.1
             goal = MoveEndEffectorGoal(endeffector='right_stick_tip',
                                             type=0, ik_type=1, pose=prepare_hit_pose,
                                             target_frame='right_stick_tip',
-                                            timeout=30, tolerance=0.1)
+                                            timeout=30, tolerance=0.1, id=note)
             self.action_client_right.send_goal(goal)
             self.action_client_right.wait_for_result(rospy.Duration.from_sec(0.5))
 
 
-    def home(self, how_high=0.15, how_y=0.2):
+    def home(self, how_high=0.15, how_y=0.1):
         # moves arms to home position above xylophone
         (left_arm_pos, right_arm_pos) = self.home_pos
         left_arm_home_pose = geometry_msgs.msg.Pose()
@@ -244,15 +213,48 @@ class Robot(Xylophone):
         self.move_arm(left_arm_ik, self.left_hand_publisher)
         self.move_arm(right_arm_ik, self.right_hand_publisher)
 
+    def play_note_callback(self, msg):
+        midi_note = msg.result.id
+        # print(msg)
+        if(midi_note):
+            # print("play note = {}".format(msg.result.note))
+            self.midi_outport.send(mido.Message('note_on',
+                                note=midi_note, velocity=40, time=10))
+
+            # self.midi_outport.send(mido.Message('note_off',
+                                # note=midi_note, velocity=64, time=400))
+
+    def play_note_thread(self, left_or_right):
+        if left_or_right == 'left':
+            rospy.Subscriber("/CARDSflow/MoveEndEffector/left_stick_tip/result", MoveEndEffectorResult,
+                                                    self.play_note_callback)
+            rospy.spin()
+        if left_or_right == 'right':
+            rospy.Subscriber("/CARDSflow/MoveEndEffector/right_stick_tip/result", MoveEndEffectorResult,
+                                                    self.play_note_callback)
+            rospy.spin()
+
     def midi_callback(self, midi_msg):
-        self.midi_msg = midi_msg.data
+        self.midi_msg = list(midi_msg.data)
+        #transpose lowest highest to xylophone range
+        if self.midi_msg[1] >= 36 and self.midi_msg[1] <= 48:
+            self.midi_msg[1]+=12
+        if self.midi_msg[1] >= 86 and self.midi_msg[1] < 98:
+            self.midi_msg[1]-=12
+
         if self.midi_msg[1] < 66:
             if not self.hit_thread_left.is_alive():
+                self.left_play_thread = threading.Thread(target=self.play_note_thread, args=('left',))
+                self.left_play_thread.setDaemon(True)
+                self.left_play_thread.start()
                 self.hit_thread_left = threading.Thread(target=self.hit_key, args=('left',))
                 self.hit_thread_left.setDaemon(True)
                 self.hit_thread_left.start()
         else:
             if not self.hit_thread_left.is_alive():
+                self.right_play_thread = threading.Thread(target=self.play_note_thread, args=('right',))
+                self.right_play_thread.setDaemon(True)
+                self.right_play_thread.start()
                 self.hit_thread_left = threading.Thread(target=self.hit_key, args=('right',))
                 self.hit_thread_left.setDaemon(True)
                 self.hit_thread_left.start()
@@ -266,6 +268,7 @@ if __name__ == '__main__':
     rospy.init_node('xylophone_hitter')
 
     roboy = Robot()
+    roboy.open_outport()
     rate = rospy.Rate(1)
     short_rate = rospy.Rate(5)
     long_rate = rospy.Rate(0.2)
